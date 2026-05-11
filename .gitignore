@@ -1,0 +1,120 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Compiled Extensions
+*.so
+
+# Distribution / Packaging
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+env/
+ENV/
+.venv/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+
+# =========================
+# IDE / Editor Files
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# FastAPI / Uvicorn
+# =========================
+*.pid
+
+# =========================
+# Pytest / Coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Jupyter Notebook
+# =========================
+.ipynb_checkpoints
+
+# =========================
+# Mac / Linux / Windows
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# mypy
+# =========================
+.mypy_cache/
+
+# =========================
+# Ruff / Lint
+# =========================
+.ruff_cache/
+
+# =========================
+# Pyre
+# =========================
+.pyre/
+
+# =========================
+# SQLite Database
+# =========================
+*.sqlite3
+*.db
+
+# =========================
+# Uploaded Files
+# =========================
+uploads/
+
+# =========================
+# Vector DB / AI Storage
+# =========================
+chroma_db/
+faiss_index/
+
+# =========================
+# Temporary Files
+# =========================
+temp/
+tmp/
+
+# =========================
+# Secrets / Keys
+# =========================
+secrets.json
+config.local.json
