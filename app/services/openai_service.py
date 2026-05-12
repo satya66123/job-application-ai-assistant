@@ -2,19 +2,16 @@ import requests
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-MODEL_NAME = "llama3:latest"
 
-
-def generate_resume_content(prompt):
+def generate_resume_content(prompt, model_name):
 
     payload = {
-        "model": MODEL_NAME,
+        "model": model_name,
         "prompt": prompt,
         "stream": False
     }
 
     try:
-
         response = requests.post(
             OLLAMA_URL,
             json=payload
