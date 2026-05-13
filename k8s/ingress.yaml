@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: job-ai-ingress
+  namespace: job-ai
+spec:
+  rules:
+    - host: job-ai.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: job-ai-service
+                port:
+                  number: 8501

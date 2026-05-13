@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-ai-assistant
+  namespace: job-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: job-ai-assistant
+  template:
+    metadata:
+      labels:
+        app: job-ai-assistant
+    spec:
+      containers:
+        - name: job-ai-assistant
+          image: job-ai-assistant:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+            - containerPort: 8501
+          envFrom:
+            - configMapRef:
+                name: job-ai-config

@@ -4,7 +4,8 @@ from app.prompts.prompts import (
     RESUME_PROMPT,
     COVER_LETTER_PROMPT,
     INTERVIEW_QUESTIONS_PROMPT,
-    ATS_PROMPT
+    ATS_PROMPT,
+    CHAT_PROMPT
 )
 from app.services.openai_service import generate_resume_content
 
@@ -19,12 +20,12 @@ def generate_resume(data: ResumeRequest):
         job_description=data.jobDescription
     )
 
-    result = generate_resume_content(
-        prompt,
-        data.modelName
-    )
+    result = generate_resume_content(prompt, data.modelName)
 
-    formatted_points = result.split("\n")
+    if not result["success"]:
+        return {"error": result["error"]}
+
+    formatted_points = result["response"].split("\n")
 
     cleaned_points = []
 
@@ -38,11 +39,7 @@ def generate_resume(data: ResumeRequest):
         if "here are" in point.lower():
             continue
 
-        point = (
-            point.replace("•", "")
-            .replace("-", "")
-            .strip()
-        )
+        point = point.replace("•", "").replace("-", "").strip()
 
         cleaned_points.append(point)
 
@@ -59,13 +56,13 @@ def generate_cover_letter(data: ResumeRequest):
         job_description=data.jobDescription
     )
 
-    result = generate_resume_content(
-        prompt,
-        data.modelName
-    )
+    result = generate_resume_content(prompt, data.modelName)
+
+    if not result["success"]:
+        return {"error": result["error"]}
 
     return {
-        "cover_letter": result.strip()
+        "cover_letter": result["response"].strip()
     }
 
 
@@ -77,12 +74,12 @@ def generate_interview_questions(data: ResumeRequest):
         job_description=data.jobDescription
     )
 
-    result = generate_resume_content(
-        prompt,
-        data.modelName
-    )
+    result = generate_resume_content(prompt, data.modelName)
 
-    formatted_questions = result.split("\n")
+    if not result["success"]:
+        return {"error": result["error"]}
+
+    formatted_questions = result["response"].split("\n")
 
     cleaned_questions = []
 
@@ -96,11 +93,7 @@ def generate_interview_questions(data: ResumeRequest):
         if "here are" in question.lower():
             continue
 
-        question = (
-            question.replace("•", "")
-            .replace("-", "")
-            .strip()
-        )
+        question = question.replace("•", "").replace("-", "").strip()
 
         cleaned_questions.append(question)
 
@@ -117,14 +110,14 @@ def ats_score(data: ResumeRequest):
         job_description=data.jobDescription
     )
 
-    result = generate_resume_content(
-        prompt,
-        data.modelName
-    )
+    result = generate_resume_content(prompt, data.modelName)
 
-    lines = result.split("\n")
+    if not result["success"]:
+        return {"error": result["error"]}
 
-    match_percentage = ""
+    lines = result["response"].split("\n")
+
+    match_percentage = "Not detected"
     missing_keywords = []
     improvement_suggestions = []
 
@@ -137,38 +130,28 @@ def ats_score(data: ResumeRequest):
         if not line:
             continue
 
-        clean_line = (
-            line.replace("*", "")
-            .replace("#", "")
-            .strip()
-        )
+        clean_line = line.replace("*", "").replace("#", "").strip()
+        lower_line = clean_line.lower()
 
-        if "match percentage" in clean_line.lower():
+        if "match percentage" in lower_line or "match score" in lower_line:
             match_percentage = clean_line.split(":")[-1].strip()
 
-        elif "missing keywords" in clean_line.lower():
+        elif "missing keywords" in lower_line:
             current_section = "missing"
 
-        elif "improvement suggestions" in clean_line.lower():
+        elif "improvement suggestions" in lower_line:
             current_section = "suggestions"
 
         elif current_section == "missing":
-            if clean_line.startswith("-") or clean_line.startswith("•"):
-                keyword = clean_line.replace("-", "").replace("•", "").strip()
+            keyword = clean_line.replace("-", "").replace("•", "").strip()
+
+            if keyword:
                 missing_keywords.append(keyword)
 
         elif current_section == "suggestions":
-            if (
-                clean_line[0].isdigit()
-                or clean_line.startswith("-")
-                or clean_line.startswith("•")
-            ):
-                suggestion = (
-                    clean_line.replace("-", "")
-                    .replace("•", "")
-                    .strip()
-                )
+            suggestion = clean_line.replace("-", "").replace("•", "").strip()
 
+            if suggestion:
                 if "." in suggestion[:3]:
                     suggestion = suggestion.split(".", 1)[1].strip()
 
@@ -178,4 +161,23 @@ def ats_score(data: ResumeRequest):
         "match_percentage": match_percentage,
         "missing_keywords": missing_keywords,
         "improvement_suggestions": improvement_suggestions
+    }
+
+
+@router.post("/chat-assistant")
+def chat_assistant(data: ResumeRequest):
+
+    prompt = CHAT_PROMPT.format(
+        resume=data.resume,
+        job_description=data.jobDescription,
+        user_message=data.userMessage
+    )
+
+    result = generate_resume_content(prompt, data.modelName)
+
+    if not result["success"]:
+        return {"error": result["error"]}
+
+    return {
+        "assistant_response": result["response"]
     }

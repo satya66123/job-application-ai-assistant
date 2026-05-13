@@ -5,3 +5,4 @@ class ResumeRequest(BaseModel):
     resume: str
     jobDescription: str
     modelName: str
+    userMessage: str = ""

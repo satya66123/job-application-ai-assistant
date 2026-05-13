@@ -8,16 +8,23 @@ Job Description:
 {job_description}
 
 Task:
-- Generate 5 highly relevant resume bullet points
-- Match the job requirements
-- Use strong action verbs
-- Keep points concise
+Generate exactly 5 ATS-friendly resume bullet points.
+
+Rules:
+- No introduction text
+- No headings
+- No explanations
+- No numbering
+- No markdown
+- Start directly with bullet points
 - Focus on measurable impact
-- Make content ATS friendly
+- Use strong action verbs
+- Match the job description closely
 
 Output:
-Bullet points only
+Only bullet points
 """
+
 
 COVER_LETTER_PROMPT = """
 You are an expert HR recruiter.
@@ -43,6 +50,7 @@ Output:
 Only the cover letter
 """
 
+
 INTERVIEW_QUESTIONS_PROMPT = """
 You are a senior technical interviewer.
 
@@ -64,8 +72,11 @@ Rules:
 - No headings
 - No numbering
 - No markdown
-- Output questions only
+
+Output:
+Questions only
 """
+
 
 ATS_PROMPT = """
 You are an ATS resume screening system.
@@ -94,4 +105,27 @@ Improvement Suggestions:
 
 No explanations.
 No markdown formatting.
+"""
+
+
+CHAT_PROMPT = """
+You are an expert AI career assistant.
+
+Candidate Resume:
+{resume}
+
+Job Description:
+{job_description}
+
+User Question:
+{user_message}
+
+Task:
+Answer the user's question using the resume and job description context.
+
+Rules:
+- Be practical
+- Be professional
+- Give actionable advice
+- Use resume/job context where relevant
 """

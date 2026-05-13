@@ -12,6 +12,7 @@ def generate_resume_content(prompt, model_name):
     }
 
     try:
+
         response = requests.post(
             OLLAMA_URL,
             json=payload
@@ -21,7 +22,25 @@ def generate_resume_content(prompt, model_name):
 
         data = response.json()
 
-        return data.get("response", "No response generated")
+        return {
+            "success": True,
+            "response": data.get("response", "No response generated")
+        }
+
+    except requests.exceptions.Timeout:
+        return {
+            "success": False,
+            "error": "Request timed out. Ollama model took too long."
+        }
+
+    except requests.exceptions.ConnectionError:
+        return {
+            "success": False,
+            "error": "Could not connect to Ollama. Is Ollama running?"
+        }
 
     except Exception as e:
-        return f"Error generating response: {str(e)}"
+        return {
+            "success": False,
+            "error": str(e)
+        }
