@@ -68,15 +68,22 @@ A complete local GenAI project for:
 ## Supported Models
 
 ```text
+deepseek-v3.1:671b-cloud
+glm-4.6:cloud
+minimax-m2:cloud
+qwen3-vl:235b-cloud
+qwen3-coder:480b-cloud
+gpt-oss:120b-cloud
+deepseek-coder:latest
 llama3:latest
 mistral:latest
-phi3:latest
-deepseek-coder:latest
 llama3:instruct
+phi3:latest
 llama3:8b
 ````
 
 ---
+
 
 ## Project Structure
 
@@ -430,6 +437,40 @@ POST /chat-assistant
 Satya Srinath Nekkanti
 
 ---
+
+# Application Screenshots
+
+## Welcome Screen
+![Welcome](screenshots/welcomeScreen.png)
+![Welcome](screenshots/welcomeScreen2.png)
+
+## Input Screen
+![Input](screenshots/input.png)
+
+## Resume Optimization
+![Resume Points](screenshots/resumepoints.png)
+
+## Cover Letter Generation
+![Cover Letter](screenshots/coverletter.png)
+
+## Interview Questions
+![Interview Questions](screenshots/interviewQ.png)
+![Interview Questions](screenshots/interviewQ2.png)
+
+## ATS Missing Keywords
+![ATS Missing](screenshots/missingats.png)
+
+## ATS Suggestions
+![ATS Suggestions](screenshots/suggestionsats.png)
+
+## Career AI Chat
+![Chat Assistant](screenshots/chat.png)
+![Chat Assistant](screenshots/chat1.png)
+![Chat Assistant](screenshots/chat3.png)
+
+
+---
+
 
 ## License
 

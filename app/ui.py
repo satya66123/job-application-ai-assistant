@@ -31,11 +31,17 @@ st.sidebar.title("⚙ Settings")
 model_name = st.sidebar.selectbox(
     "Choose AI Model",
     [
+
+        # Coding
+        "deepseek-coder:latest",
+
+        # General purpose
         "llama3:latest",
         "mistral:latest",
-        "phi3:latest",
-        "deepseek-coder:latest",
         "llama3:instruct",
+
+        # Fast
+        "phi3:latest",
         "llama3:8b"
     ]
 )
@@ -333,7 +339,7 @@ else:
             response = requests.post(
                 f"{API_URL}/chat-assistant",
                 json=payload,
-                timeout=200
+                timeout=600
             )
 
         if response.status_code == 200:
