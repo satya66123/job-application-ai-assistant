@@ -15,21 +15,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# Session state initialization
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# ---------------- SESSION STATE ----------------
 
-if "generated_history" not in st.session_state:
-    st.session_state.generated_history = []
+DEFAULT_SESSION_VALUES = {
+    "chat_history": [],
+    "generated_history": [],
+    "jwt_token": None,
+    "current_user": None
+}
 
-if "jwt_token" not in st.session_state:
-    st.session_state.jwt_token = None
-
-if "current_user" not in st.session_state:
-    st.session_state.current_user = None
+for key, value in DEFAULT_SESSION_VALUES.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
-# ---------------- AUTH HELPERS ----------------
+# ---------------- API HELPERS ----------------
+
+def get_auth_headers():
+    return {
+        "Authorization": f"Bearer {st.session_state.jwt_token}"
+    }
+
 
 def register_user(full_name, email, password):
     payload = {
@@ -38,12 +44,11 @@ def register_user(full_name, email, password):
         "password": password
     }
 
-    response = requests.post(
+    return requests.post(
         f"{API_URL}/auth/register",
-        json=payload
+        json=payload,
+        timeout=30
     )
-
-    return response
 
 
 def login_user(email, password):
@@ -52,28 +57,84 @@ def login_user(email, password):
         "password": password
     }
 
-    response = requests.post(
+    return requests.post(
         f"{API_URL}/auth/login",
-        json=payload
+        json=payload,
+        timeout=30
     )
-
-    return response
 
 
 def fetch_current_user(token):
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    response = requests.get(
+    return requests.get(
         f"{API_URL}/auth/me",
-        headers=headers
+        headers={
+            "Authorization": f"Bearer {token}"
+        },
+        timeout=30
     )
 
-    return response
+
+def fetch_saved_outputs():
+    return requests.get(
+        f"{API_URL}/history/outputs",
+        headers=get_auth_headers(),
+        timeout=30
+    )
 
 
-# ---------------- AUTH UI ----------------
+def fetch_saved_chat():
+    return requests.get(
+        f"{API_URL}/history/chat",
+        headers=get_auth_headers(),
+        timeout=30
+    )
+
+
+def fetch_uploaded_documents():
+    return requests.get(
+        f"{API_URL}/rag/documents",
+        headers=get_auth_headers(),
+        timeout=30
+    )
+
+
+def fetch_saved_ats():
+    return requests.get(
+        f"{API_URL}/history/ats",
+        headers=get_auth_headers(),
+        timeout=30
+    )
+
+
+def upload_knowledge(filename, document_text):
+    payload = {
+        "filename": filename,
+        "document_text": document_text
+    }
+
+    return requests.post(
+        f"{API_URL}/rag/upload-knowledge",
+        json=payload,
+        headers=get_auth_headers(),
+        timeout=300
+    )
+
+
+def rag_chat(question, model_name):
+    payload = {
+        "question": question,
+        "modelName": model_name
+    }
+
+    return requests.post(
+        f"{API_URL}/rag/chat",
+        json=payload,
+        headers=get_auth_headers(),
+        timeout=300
+    )
+
+
+# ---------------- AUTH ----------------
 
 st.sidebar.title("🔐 Authentication")
 
@@ -98,24 +159,30 @@ if st.session_state.jwt_token is None:
         if st.sidebar.button("Register"):
 
             if not reg_name or not reg_email or not reg_password:
-                st.sidebar.warning("All fields required")
+                st.sidebar.warning("All fields are required")
                 st.stop()
 
-            response = register_user(
-                reg_name,
-                reg_email,
-                reg_password
-            )
+            try:
+                response = register_user(
+                    reg_name,
+                    reg_email,
+                    reg_password
+                )
 
-            if response.status_code == 200:
-                st.sidebar.success("Registration successful")
-            else:
-                try:
-                    st.sidebar.error(response.json()["detail"])
-                except:
-                    st.sidebar.error("Registration failed")
+                if response.status_code == 200:
+                    st.sidebar.success("Registration successful")
+                else:
+                    try:
+                        st.sidebar.error(
+                            response.json().get("detail", "Registration failed")
+                        )
+                    except:
+                        st.sidebar.error("Registration failed")
 
-    elif auth_option == "Login":
+            except requests.exceptions.RequestException as e:
+                st.sidebar.error(str(e))
+
+    else:
 
         st.sidebar.subheader("Login")
 
@@ -131,33 +198,36 @@ if st.session_state.jwt_token is None:
                 st.sidebar.warning("Email and password required")
                 st.stop()
 
-            response = login_user(
-                login_email,
-                login_password
-            )
-
-            if response.status_code == 200:
-
-                token_data = response.json()
-
-                st.session_state.jwt_token = token_data["access_token"]
-
-                me_response = fetch_current_user(
-                    st.session_state.jwt_token
+            try:
+                response = login_user(
+                    login_email,
+                    login_password
                 )
 
-                if me_response.status_code == 200:
-                    st.session_state.current_user = me_response.json()
+                if response.status_code == 200:
 
-                st.rerun()
+                    token_data = response.json()
 
-            else:
-                st.sidebar.error("Invalid credentials")
+                    st.session_state.jwt_token = token_data["access_token"]
+
+                    me_response = fetch_current_user(
+                        st.session_state.jwt_token
+                    )
+
+                    if me_response.status_code == 200:
+                        st.session_state.current_user = me_response.json()
+
+                    st.rerun()
+
+                else:
+                    st.sidebar.error("Invalid credentials")
+
+            except requests.exceptions.RequestException as e:
+                st.sidebar.error(str(e))
 
     st.stop()
 
-
-# ---------------- LOGGED IN UI ----------------
+# ---------------- LOGGED IN ----------------
 
 st.sidebar.success(
     f"Logged in as {st.session_state.current_user['full_name']}"
@@ -171,10 +241,10 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 
-st.title("🚀 Job Application AI Assistant")
-st.caption("AI-powered career assistant using local Ollama models")
+# ---------------- MAIN UI ----------------
 
-# ---------------- SIDEBAR SETTINGS ----------------
+st.title("🚀 Job Application AI Assistant")
+st.caption("AI-powered career assistant using Ollama + FastAPI + RAG")
 
 st.sidebar.title("⚙ Settings")
 
@@ -197,97 +267,273 @@ task = st.sidebar.selectbox(
         "Generate Cover Letter",
         "Generate Interview Questions",
         "ATS Score Checker",
-        "Career AI Chat"
+        "Career AI Chat",
+        "RAG Knowledge Upload",
+        "RAG Chat"
     ]
 )
 
-st.sidebar.info("Supported uploads: PDF / DOCX / TXT")
+st.sidebar.info("Supported resume uploads: PDF / DOCX / TXT")
 
 if st.sidebar.button("🗑 Clear Session History"):
     st.session_state.chat_history = []
     st.session_state.generated_history = []
     st.rerun()
 
-if st.session_state.generated_history:
 
-    st.sidebar.subheader("📜 Generated History")
+# ---------------- SAVED HISTORY ----------------
 
-    for idx, item in enumerate(
-        reversed(st.session_state.generated_history),
-        1
-    ):
-        with st.sidebar.expander(f"{idx}. {item['type']}"):
-            st.write(item["content"][:1000])
+st.sidebar.subheader("📜 Saved History")
+
+try:
+
+    outputs_response = fetch_saved_outputs()
+
+    if outputs_response.status_code == 200:
+        outputs = outputs_response.json()
+
+        for idx, item in enumerate(outputs[:10], 1):
+            with st.sidebar.expander(
+                f"{idx}. {item['output_type']}"
+            ):
+                st.write(item["content"][:1000])
+
+    ats_response = fetch_saved_ats()
+
+    if ats_response.status_code == 200:
+        ats_reports = ats_response.json()
+
+        for idx, report in enumerate(ats_reports[:5], 1):
+            with st.sidebar.expander(
+                f"ATS {idx} - {report['match_score']}"
+            ):
+                st.write(report["report"][:1000])
+
+    chat_response = fetch_saved_chat()
+
+    if chat_response.status_code == 200:
+        chats = chat_response.json()
+
+        for idx, chat in enumerate(chats[:5], 1):
+            with st.sidebar.expander(f"Chat {idx}"):
+                st.write("Q: " + chat["message"])
+                st.write("A: " + chat["response"])
+
+except requests.exceptions.RequestException:
+    st.sidebar.info("No saved history yet")
 
 
-# ---------------- MAIN LAYOUT ----------------
+st.sidebar.subheader("📂 Uploaded Knowledge Documents")
 
-left_col, right_col = st.columns(2)
+try:
+    docs_response = fetch_uploaded_documents()
 
-resume = ""
-job_description = ""
+    if docs_response.status_code == 200:
+        docs = docs_response.json()
 
-with left_col:
+        if docs:
+            for doc in docs[:10]:
+                st.sidebar.write(f"📄 {doc['filename']}")
+        else:
+            st.sidebar.info("No uploaded documents")
 
-    st.subheader("Resume Input")
+except requests.exceptions.RequestException:
+    st.sidebar.info("Documents unavailable")
 
-    uploaded_file = st.file_uploader(
-        "Upload Resume",
-        type=["pdf", "docx", "txt"]
+
+
+
+
+# ---------------- RAG KNOWLEDGE UPLOAD ----------------
+
+if task == "RAG Knowledge Upload":
+
+    st.subheader("📚 Upload Knowledge Base")
+
+    rag_uploaded_file = st.file_uploader(
+        "Upload PDF / DOCX / TXT",
+        type=["pdf", "docx", "txt"],
+        key="rag_upload"
     )
 
-    if uploaded_file:
+    rag_text = ""
 
-        file_extension = uploaded_file.name.split(".")[-1].lower()
+    filename = "manual_knowledge.txt"
 
-        if file_extension == "pdf":
-            resume = extract_text_from_pdf(uploaded_file)
+    if rag_uploaded_file:
 
-        elif file_extension == "docx":
-            resume = extract_text_from_docx(uploaded_file)
+        filename = rag_uploaded_file.name
+        ext = filename.split(".")[-1].lower()
 
-        elif file_extension == "txt":
-            resume = extract_text_from_txt(uploaded_file)
+        try:
+            if ext == "pdf":
+                rag_text = extract_text_from_pdf(rag_uploaded_file)
 
-        if not resume.strip():
-            st.error("Could not extract resume text")
-            st.stop()
+            elif ext == "docx":
+                rag_text = extract_text_from_docx(rag_uploaded_file)
 
-        st.success("Resume uploaded successfully")
+            elif ext == "txt":
+                rag_text = extract_text_from_txt(rag_uploaded_file)
 
-        with st.expander("Preview Extracted Resume"):
-            st.text(resume[:3000])
+            if rag_text.strip():
+                st.success(f"Extracted content from {filename}")
+
+                with st.expander("Preview Extracted Knowledge"):
+                    st.text(rag_text[:3000])
+
+        except Exception as e:
+            st.error(f"File parsing failed: {str(e)}")
 
     else:
-        resume = st.text_area(
-            "Paste Resume",
-            height=400,
-            placeholder="Paste resume content here..."
+
+        rag_text = st.text_area(
+            "Or paste knowledge manually",
+            height=300
         )
 
-with right_col:
+    if st.button("Upload Knowledge"):
 
-    st.subheader("Job Description")
+        if not rag_text.strip():
+            st.warning("Upload a file or paste knowledge first")
+            st.stop()
 
-    job_description = st.text_area(
-        "Paste Job Description",
-        height=400,
-        placeholder="Paste job description here..."
+        try:
+            with st.spinner("Chunking + embedding + storing..."):
+
+                response = upload_knowledge(
+                    filename,
+                    rag_text
+                )
+
+            if response.status_code == 200:
+
+                data = response.json()
+
+                st.success(
+                    f"Knowledge uploaded successfully | Chunks: {data['chunks_created']}"
+                )
+
+            else:
+                st.error(response.text)
+
+        except requests.exceptions.RequestException as e:
+            st.error(str(e))
+
+    st.stop()
+
+# ---------------- RAG CHAT ----------------
+
+if task == "RAG Chat":
+
+    st.subheader("🧠 RAG Knowledge Chat")
+
+    rag_question = st.text_input(
+        "Ask a question from uploaded knowledge"
     )
 
-st.divider()
+    if st.button("Ask RAG"):
+
+        if not rag_question.strip():
+            st.warning("Enter a question")
+            st.stop()
+
+        try:
+            with st.spinner("Retrieving relevant knowledge..."):
+
+                response = rag_chat(
+                    rag_question,
+                    model_name
+                )
+
+            if response.status_code == 200:
+
+                data = response.json()
+
+                st.success("Answer generated")
+
+                st.write(data["answer"])
+
+            else:
+                st.error(response.text)
+
+        except requests.exceptions.RequestException as e:
+            st.error(str(e))
+
+    st.stop()
+
 
 # ---------------- STANDARD TOOLS ----------------
 
-if task != "Career AI Chat":
+STANDARD_TASKS = [
+    "Generate Resume Points",
+    "Generate Cover Letter",
+    "Generate Interview Questions",
+    "ATS Score Checker"
+]
+
+if task in STANDARD_TASKS:
+    # ---------------- INPUTS ----------------
+
+    left_col, right_col = st.columns(2)
+
+    resume = ""
+    job_description = ""
+
+    with left_col:
+
+        st.subheader("Resume Input")
+
+        uploaded_file = st.file_uploader(
+            "Upload Resume",
+            type=["pdf", "docx", "txt"]
+        )
+
+        if uploaded_file:
+
+            ext = uploaded_file.name.split(".")[-1].lower()
+
+            if ext == "pdf":
+                resume = extract_text_from_pdf(uploaded_file)
+
+            elif ext == "docx":
+                resume = extract_text_from_docx(uploaded_file)
+
+            elif ext == "txt":
+                resume = extract_text_from_txt(uploaded_file)
+
+            if not resume.strip():
+                st.error("Could not extract resume text")
+                st.stop()
+
+            st.success("Resume uploaded successfully")
+
+            with st.expander("Preview Resume"):
+                st.text(resume[:3000])
+
+        else:
+            resume = st.text_area(
+                "Paste Resume",
+                height=400
+            )
+
+    with right_col:
+
+        st.subheader("Job Description")
+
+        job_description = st.text_area(
+            "Paste Job Description",
+            height=400
+        )
+
+    st.divider()
 
     if st.button("🚀 Generate", use_container_width=True):
 
-        if not resume:
-            st.warning("Please upload or paste your resume")
+        if not resume.strip():
+            st.warning("Please provide resume")
             st.stop()
 
-        if not job_description:
+        if not job_description.strip():
             st.warning("Please provide job description")
             st.stop()
 
@@ -313,155 +559,139 @@ if task != "Career AI Chat":
                 response = requests.post(
                     f"{API_URL}{endpoint}",
                     json=payload,
+                    headers=get_auth_headers(),
                     timeout=300
                 )
 
-            if response.status_code == 200:
+            if response.status_code != 200:
+                st.error(response.text)
+                st.stop()
 
-                data = response.json()
+            data = response.json()
 
-                if "error" in data:
-                    st.error(data["error"])
-                    st.stop()
+            if "error" in data:
+                st.error(data["error"])
+                st.stop()
 
-                st.success("Generation completed")
+            if task == "Generate Resume Points":
 
-                if task == "Generate Resume Points":
+                st.subheader("Generated Resume Points")
 
-                    st.subheader("Generated Resume Points")
+                output = ""
 
-                    output_text = ""
+                for point in data["generated_resume_points"]:
+                    st.write(f"• {point}")
+                    output += f"• {point}\n"
 
-                    for point in data["generated_resume_points"]:
-                        st.write(f"• {point}")
-                        output_text += f"• {point}\n"
+                st.session_state.generated_history.append({
+                    "type": "Resume Points",
+                    "content": output
+                })
 
-                    st.session_state.generated_history.append({
-                        "type": "Resume Points",
-                        "content": output_text
-                    })
+                st.download_button(
+                    "Download Resume Points",
+                    output,
+                    "resume_points.txt"
+                )
 
-                    st.download_button(
-                        "Download Resume Points",
-                        output_text,
-                        "resume_points.txt",
-                        "text/plain"
-                    )
+            elif task == "Generate Cover Letter":
 
-                elif task == "Generate Cover Letter":
+                cover_letter = data["cover_letter"]
 
-                    st.subheader("Generated Cover Letter")
+                st.text_area(
+                    "Generated Cover Letter",
+                    cover_letter,
+                    height=400
+                )
 
-                    st.text_area(
-                        "Cover Letter",
-                        data["cover_letter"],
-                        height=400
-                    )
+                st.session_state.generated_history.append({
+                    "type": "Cover Letter",
+                    "content": cover_letter
+                })
 
-                    st.session_state.generated_history.append({
-                        "type": "Cover Letter",
-                        "content": data["cover_letter"]
-                    })
+                st.download_button(
+                    "Download Cover Letter",
+                    cover_letter,
+                    "cover_letter.txt"
+                )
 
-                    st.download_button(
-                        "Download Cover Letter",
-                        data["cover_letter"],
-                        "cover_letter.txt",
-                        "text/plain"
-                    )
+            elif task == "Generate Interview Questions":
 
-                elif task == "Generate Interview Questions":
+                st.subheader("Interview Questions")
 
-                    st.subheader("Interview Questions")
+                output = ""
 
-                    output_text = ""
+                for question in data["interview_questions"]:
+                    st.write(f"• {question}")
+                    output += f"• {question}\n"
 
-                    for question in data["interview_questions"]:
-                        st.write(f"• {question}")
-                        output_text += f"• {question}\n"
+                st.session_state.generated_history.append({
+                    "type": "Interview Questions",
+                    "content": output
+                })
 
-                    st.session_state.generated_history.append({
-                        "type": "Interview Questions",
-                        "content": output_text
-                    })
+                st.download_button(
+                    "Download Interview Questions",
+                    output,
+                    "interview_questions.txt"
+                )
 
-                    st.download_button(
-                        "Download Interview Questions",
-                        output_text,
-                        "interview_questions.txt",
-                        "text/plain"
-                    )
+            elif task == "ATS Score Checker":
 
-                elif task == "ATS Score Checker":
+                st.subheader("ATS Analysis")
 
-                    st.subheader("ATS Analysis")
+                st.metric(
+                    "Match Percentage",
+                    data["match_percentage"]
+                )
 
-                    col1, col2 = st.columns(2)
+                report = f"ATS Score: {data['match_percentage']}\n\n"
 
-                    with col1:
-                        st.metric("Match Percentage", data["match_percentage"])
+                st.subheader("Missing Keywords")
 
-                    ats_output = f"ATS Match Percentage: {data['match_percentage']}\n\n"
+                if data["missing_keywords"]:
+                    for keyword in data["missing_keywords"]:
+                        st.write(f"• {keyword}")
+                        report += f"Missing Keyword: {keyword}\n"
+                else:
+                    st.success("No missing keywords detected")
 
-                    with col2:
-                        st.success("Analysis Complete")
+                st.subheader("Improvement Suggestions")
 
-                    tab1, tab2 = st.tabs(
-                        ["Missing Keywords", "Improvement Suggestions"]
-                    )
+                if data["improvement_suggestions"]:
+                    for suggestion in data["improvement_suggestions"]:
+                        st.write(f"• {suggestion}")
+                        report += f"Suggestion: {suggestion}\n"
+                else:
+                    st.success("No major suggestions")
 
-                    with tab1:
+                st.session_state.generated_history.append({
+                    "type": "ATS Report",
+                    "content": report
+                })
 
-                        if data["missing_keywords"]:
-                            for keyword in data["missing_keywords"]:
-                                st.write(f"• {keyword}")
-                                ats_output += f"Missing Keyword: {keyword}\n"
-                        else:
-                            st.success("No major missing keywords")
+                st.download_button(
+                    "Download ATS Report",
+                    report,
+                    "ats_report.txt"
+                )
 
-                    with tab2:
-
-                        if data["improvement_suggestions"]:
-                            for suggestion in data["improvement_suggestions"]:
-                                st.write(f"• {suggestion}")
-                                ats_output += f"Suggestion: {suggestion}\n"
-                        else:
-                            st.success("Resume looks strong")
-
-                    st.session_state.generated_history.append({
-                        "type": "ATS Report",
-                        "content": ats_output
-                    })
-
-                    st.download_button(
-                        "Download ATS Report",
-                        ats_output,
-                        "ats_report.txt",
-                        "text/plain"
-                    )
-
-            else:
-                st.error(f"API request failed: {response.text}")
-
-        except requests.exceptions.Timeout:
-            st.error("Request timed out. Try a smaller model like phi3.")
-
-        except Exception as e:
-            st.error(f"Unexpected error: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            st.error(str(e))
 
 
-# ---------------- CHAT MODE ----------------
+# ---------------- CAREER AI CHAT ----------------
 
-else:
+if task == "Career AI Chat":
 
     st.subheader("💬 Career AI Chat")
 
-    if not resume:
-        st.warning("Please upload or paste your resume for chat context")
+    if not resume.strip():
+        st.warning("Please provide resume")
         st.stop()
 
-    if not job_description:
-        st.warning("Please provide job description for chat context")
+    if not job_description.strip():
+        st.warning("Please provide job description")
         st.stop()
 
     for message in st.session_state.chat_history:
@@ -469,7 +699,9 @@ else:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    user_input = st.chat_input("Ask career-related questions...")
+    user_input = st.chat_input(
+        "Ask career-related questions..."
+    )
 
     if user_input:
 
@@ -494,37 +726,34 @@ else:
                 response = requests.post(
                     f"{API_URL}/chat-assistant",
                     json=payload,
+                    headers=get_auth_headers(),
                     timeout=600
                 )
 
-            if response.status_code == 200:
+            if response.status_code != 200:
+                st.error(response.text)
+                st.stop()
 
-                data = response.json()
+            data = response.json()
 
-                if "error" in data:
-                    st.error(data["error"])
-                    st.stop()
+            if "error" in data:
+                st.error(data["error"])
+                st.stop()
 
-                assistant_reply = data["assistant_response"]
+            assistant_reply = data["assistant_response"]
 
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": assistant_reply
-                })
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": assistant_reply
+            })
 
-                st.session_state.generated_history.append({
-                    "type": "Career Chat",
-                    "content": assistant_reply
-                })
+            st.session_state.generated_history.append({
+                "type": "Career Chat",
+                "content": assistant_reply
+            })
 
-                with st.chat_message("assistant"):
-                    st.write(assistant_reply)
+            with st.chat_message("assistant"):
+                st.write(assistant_reply)
 
-            else:
-                st.error(f"Chat API failed: {response.text}")
-
-        except requests.exceptions.Timeout:
-            st.error("Chat timed out. Try phi3 or llama3.")
-
-        except Exception as e:
-            st.error(f"Unexpected error: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            st.error(str(e))

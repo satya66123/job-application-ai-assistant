@@ -6,6 +6,8 @@ from app.routes.auth_routes import router as auth_router
 
 # existing imports
 from app.routes.resume_routes import router as resume_router
+from app.routes.history_routes import router as history_router
+from app.routes.rag_routes import router as rag_router
 
 app = FastAPI(
     title="Job Application AI Assistant API"
@@ -22,7 +24,9 @@ app.add_middleware(
 init_database()
 
 app.include_router(auth_router)
+app.include_router(history_router)
 app.include_router(resume_router)
+app.include_router(rag_router)
 
 
 @app.get("/")

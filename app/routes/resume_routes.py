@@ -1,4 +1,10 @@
 from fastapi import APIRouter
+from fastapi import Depends
+from fastapi.security import HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
+
+from sqlalchemy.orm import Session
+
 from app.models.request_models import ResumeRequest
 from app.prompts.prompts import (
     RESUME_PROMPT,
@@ -7,13 +13,29 @@ from app.prompts.prompts import (
     ATS_PROMPT,
     CHAT_PROMPT
 )
+
 from app.services.openai_service import generate_resume_content
+
+from app.db.database import get_db
+from app.auth.dependencies import get_current_user
+
+from app.repositories.chat_repository import save_chat
+from app.repositories.output_repository import save_generated_output
+from app.repositories.ats_repository import save_ats_report
 
 router = APIRouter()
 
+security = HTTPBearer()
+
 
 @router.post("/generate-resume")
-def generate_resume(data: ResumeRequest):
+def generate_resume(
+    data: ResumeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+    user = get_current_user(token=token, db=db)
 
     prompt = RESUME_PROMPT.format(
         resume=data.resume,
@@ -26,11 +48,9 @@ def generate_resume(data: ResumeRequest):
         return {"error": result["error"]}
 
     formatted_points = result["response"].split("\n")
-
     cleaned_points = []
 
     for point in formatted_points:
-
         point = point.strip()
 
         if not point:
@@ -40,8 +60,16 @@ def generate_resume(data: ResumeRequest):
             continue
 
         point = point.replace("•", "").replace("-", "").strip()
-
         cleaned_points.append(point)
+
+    output_text = "\n".join(cleaned_points)
+
+    save_generated_output(
+        db=db,
+        user_id=user.id,
+        output_type="Resume Points",
+        content=output_text
+    )
 
     return {
         "generated_resume_points": cleaned_points
@@ -49,7 +77,13 @@ def generate_resume(data: ResumeRequest):
 
 
 @router.post("/generate-cover-letter")
-def generate_cover_letter(data: ResumeRequest):
+def generate_cover_letter(
+    data: ResumeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+    user = get_current_user(token=token, db=db)
 
     prompt = COVER_LETTER_PROMPT.format(
         resume=data.resume,
@@ -61,13 +95,28 @@ def generate_cover_letter(data: ResumeRequest):
     if not result["success"]:
         return {"error": result["error"]}
 
+    cover_letter = result["response"].strip()
+
+    save_generated_output(
+        db=db,
+        user_id=user.id,
+        output_type="Cover Letter",
+        content=cover_letter
+    )
+
     return {
-        "cover_letter": result["response"].strip()
+        "cover_letter": cover_letter
     }
 
 
 @router.post("/generate-interview-questions")
-def generate_interview_questions(data: ResumeRequest):
+def generate_interview_questions(
+    data: ResumeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+    user = get_current_user(token=token, db=db)
 
     prompt = INTERVIEW_QUESTIONS_PROMPT.format(
         resume=data.resume,
@@ -80,11 +129,9 @@ def generate_interview_questions(data: ResumeRequest):
         return {"error": result["error"]}
 
     formatted_questions = result["response"].split("\n")
-
     cleaned_questions = []
 
     for question in formatted_questions:
-
         question = question.strip()
 
         if not question:
@@ -94,8 +141,16 @@ def generate_interview_questions(data: ResumeRequest):
             continue
 
         question = question.replace("•", "").replace("-", "").strip()
-
         cleaned_questions.append(question)
+
+    output_text = "\n".join(cleaned_questions)
+
+    save_generated_output(
+        db=db,
+        user_id=user.id,
+        output_type="Interview Questions",
+        content=output_text
+    )
 
     return {
         "interview_questions": cleaned_questions
@@ -103,7 +158,13 @@ def generate_interview_questions(data: ResumeRequest):
 
 
 @router.post("/ats-score")
-def ats_score(data: ResumeRequest):
+def ats_score(
+    data: ResumeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+    user = get_current_user(token=token, db=db)
 
     prompt = ATS_PROMPT.format(
         resume=data.resume,
@@ -120,11 +181,9 @@ def ats_score(data: ResumeRequest):
     match_percentage = "Not detected"
     missing_keywords = []
     improvement_suggestions = []
-
     current_section = None
 
     for line in lines:
-
         line = line.strip()
 
         if not line:
@@ -157,6 +216,17 @@ def ats_score(data: ResumeRequest):
 
                 improvement_suggestions.append(suggestion)
 
+    ats_report_text = result["response"]
+
+    save_ats_report(
+        db=db,
+        user_id=user.id,
+        resume_text=data.resume,
+        job_description=data.jobDescription,
+        match_score=match_percentage,
+        report=ats_report_text
+    )
+
     return {
         "match_percentage": match_percentage,
         "missing_keywords": missing_keywords,
@@ -165,7 +235,13 @@ def ats_score(data: ResumeRequest):
 
 
 @router.post("/chat-assistant")
-def chat_assistant(data: ResumeRequest):
+def chat_assistant(
+    data: ResumeRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+    user = get_current_user(token=token, db=db)
 
     prompt = CHAT_PROMPT.format(
         resume=data.resume,
@@ -178,6 +254,15 @@ def chat_assistant(data: ResumeRequest):
     if not result["success"]:
         return {"error": result["error"]}
 
+    assistant_response = result["response"]
+
+    save_chat(
+        db=db,
+        user_id=user.id,
+        message=data.userMessage,
+        response=assistant_response
+    )
+
     return {
-        "assistant_response": result["response"]
+        "assistant_response": assistant_response
     }

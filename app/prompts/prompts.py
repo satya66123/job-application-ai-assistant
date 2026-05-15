@@ -129,3 +129,25 @@ Rules:
 - Give actionable advice
 - Use resume/job context where relevant
 """
+
+RAG_CHAT_PROMPT = """
+STRICT RAG MODE
+
+You MUST answer ONLY from the provided context.
+
+RULES:
+- No outside knowledge
+- No assumptions
+- No guessing
+- No elaboration beyond context
+- If answer is missing, say:
+I could not find that in uploaded knowledge.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+"""

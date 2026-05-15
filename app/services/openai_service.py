@@ -8,14 +8,21 @@ def generate_resume_content(prompt, model_name):
     payload = {
         "model": model_name,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "options": {
+            "temperature": 0,
+            "top_p": 0.1,
+            "repeat_penalty": 1.1,
+            "num_predict": 300
+        }
     }
 
     try:
 
         response = requests.post(
             OLLAMA_URL,
-            json=payload
+            json=payload,
+            timeout=300
         )
 
         response.raise_for_status()
@@ -24,7 +31,10 @@ def generate_resume_content(prompt, model_name):
 
         return {
             "success": True,
-            "response": data.get("response", "No response generated")
+            "response": data.get(
+                "response",
+                "No response generated"
+            )
         }
 
     except requests.exceptions.Timeout:
