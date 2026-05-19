@@ -63,6 +63,12 @@ def login_user(email, password):
         timeout=30
     )
 
+def delete_uploaded_document(document_id):
+    return requests.delete(
+        f"{API_URL}/rag/documents/{document_id}",
+        headers=get_auth_headers(),
+        timeout=30
+    )
 
 def fetch_current_user(token):
     return requests.get(
@@ -120,10 +126,11 @@ def upload_knowledge(filename, document_text):
     )
 
 
-def rag_chat(question, model_name):
+def rag_chat(question, model_name, chat_history):
     payload = {
         "question": question,
-        "modelName": model_name
+        "modelName": model_name,
+        "chat_history": chat_history
     }
 
     return requests.post(
@@ -132,7 +139,6 @@ def rag_chat(question, model_name):
         headers=get_auth_headers(),
         timeout=300
     )
-
 
 # ---------------- AUTH ----------------
 
@@ -332,18 +338,31 @@ try:
         docs = docs_response.json()
 
         if docs:
+
             for doc in docs[:10]:
-                st.sidebar.write(f"📄 {doc['filename']}")
+
+                col1, col2 = st.sidebar.columns([4, 1])
+
+                with col1:
+                    st.write(f"📄 {doc['filename']}")
+
+                with col2:
+                    if st.button(
+                        "🗑",
+                        key=f"delete_{doc['id']}"
+                    ):
+                        delete_response = delete_uploaded_document(
+                            doc["id"]
+                        )
+
+                        if delete_response.status_code == 200:
+                            st.rerun()
+
         else:
             st.sidebar.info("No uploaded documents")
 
 except requests.exceptions.RequestException:
     st.sidebar.info("Documents unavailable")
-
-
-
-
-
 # ---------------- RAG KNOWLEDGE UPLOAD ----------------
 
 if task == "RAG Knowledge Upload":
@@ -442,7 +461,8 @@ if task == "RAG Chat":
 
                 response = rag_chat(
                     rag_question,
-                    model_name
+                    model_name,
+                    st.session_state.chat_history
                 )
 
             if response.status_code == 200:
@@ -451,7 +471,19 @@ if task == "RAG Chat":
 
                 st.success("Answer generated")
 
-                st.write(data["answer"])
+                answer = data["answer"]
+
+                st.session_state.chat_history.append({
+                    "role": "user",
+                    "content": rag_question
+                })
+
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": answer
+                })
+
+                st.write(answer)
 
             else:
                 st.error(response.text)

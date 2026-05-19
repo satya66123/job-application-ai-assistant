@@ -30,3 +30,21 @@ def get_uploaded_documents(
     ).order_by(
         UploadedDocument.created_at.desc()
     ).all()
+
+def delete_uploaded_document(
+    db: Session,
+    document_id: int,
+    user_id: int
+):
+    doc = db.query(UploadedDocument).filter(
+        UploadedDocument.id == document_id,
+        UploadedDocument.user_id == user_id
+    ).first()
+
+    if not doc:
+        return None
+
+    db.delete(doc)
+    db.commit()
+
+    return doc
