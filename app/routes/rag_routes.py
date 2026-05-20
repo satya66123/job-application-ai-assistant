@@ -15,6 +15,8 @@ from app.vectorstore.chroma_store import delete_vectors_by_filename
 from app.prompts.prompts import RAG_CHAT_PROMPT
 from app.services.openai_service import generate_resume_content
 
+from app.repositories.document_repository import document_exists
+
 from app.repositories.document_repository import (
     save_uploaded_document,
     get_uploaded_documents,
@@ -34,13 +36,13 @@ security = HTTPBearer()
 class KnowledgeUploadRequest(BaseModel):
     filename: str
     document_text: str
-
+    collection_name: str = "General"
 
 class RAGChatRequest(BaseModel):
     question: str
     modelName: str
+    collection_name: str = "General"
     chat_history: list = []
-
 # ---------------- UPLOAD KNOWLEDGE ----------------
 
 @router.post("/upload-knowledge")
@@ -56,17 +58,28 @@ def upload_knowledge(
         db=db
     )
 
+    if document_exists(
+            db=db,
+            user_id=user.id,
+            filename=data.filename
+    ):
+        return {
+            "error": "Document with same filename already uploaded."
+        }
+
     chunk_count = ingest_document(
         data.document_text,
         user.id,
-        data.filename
+        data.filename,
+        data.collection_name
     )
 
     save_uploaded_document(
         db=db,
         user_id=user.id,
         filename=data.filename,
-        document_text=data.document_text
+        document_text=data.document_text,
+        collection_name=data.collection_name
     )
 
     return {
@@ -91,20 +104,23 @@ def rag_chat(
         db=db
     )
 
-    context = retrieve_context(
+    retrieval_result = retrieve_context(
         user.id,
-        data.question
+        data.question,
+        data.collection_name
     )
 
-    print("RAG CONTEXT:")
-    print(repr(context))
+    context = retrieval_result.get("context", "")
+    sources = retrieval_result.get("sources", [])
 
-    print("QUESTION:")
-    print(data.question)
+    print("RAG CONTEXT:", repr(context))
+    print("SOURCES:", sources)
+    print("QUESTION:", data.question)
 
-    if not context or not context.strip():
+    if not context:
         return {
             "answer": "I could not find that in uploaded knowledge.",
+            "sources": [],
             "user_id": user.id
         }
 
@@ -113,7 +129,6 @@ def rag_chat(
     for message in data.chat_history[-6:]:
         role = message.get("role", "user")
         content = message.get("content", "")
-
         history_text += f"{role}: {content}\n"
 
     full_question = f"""
@@ -136,13 +151,26 @@ Current question:
 
     if not result["success"]:
         return {
-            "error": result["error"]
+            "error": result["error"],
+            "sources": []
+        }
+
+    answer = result["response"]
+    fallback = "I could not find"
+
+    if "could not find" in answer.casefold():
+        return {
+            "answer": answer,
+            "sources": [],
+            "user_id": user.id
         }
 
     return {
-        "answer": result["response"],
+        "answer": answer,
+        "sources": sources,
         "user_id": user.id
     }
+
 # ---------------- LIST DOCUMENTS ----------------
 
 @router.get("/documents")

@@ -22,6 +22,11 @@ class UploadedDocument(Base):
 
     filename = Column(String(255))
 
+    collection_name = Column(
+        String(100),
+        default="General"
+    )
+
     document_text = Column(Text)
 
     created_at = Column(

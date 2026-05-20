@@ -6,12 +6,14 @@ def save_uploaded_document(
     db: Session,
     user_id: int,
     filename: str,
-    document_text: str
+    document_text: str,
+    collection_name: str
 ):
     doc = UploadedDocument(
         user_id=user_id,
         filename=filename,
-        document_text=document_text
+        document_text=document_text,
+        collection_name=collection_name
     )
 
     db.add(doc)
@@ -31,6 +33,7 @@ def get_uploaded_documents(
         UploadedDocument.created_at.desc()
     ).all()
 
+
 def delete_uploaded_document(
     db: Session,
     document_id: int,
@@ -48,3 +51,16 @@ def delete_uploaded_document(
     db.commit()
 
     return doc
+
+
+def document_exists(
+    db: Session,
+    user_id: int,
+    filename: str
+):
+    existing = db.query(UploadedDocument).filter(
+        UploadedDocument.user_id == user_id,
+        UploadedDocument.filename == filename
+    ).first()
+
+    return existing is not None

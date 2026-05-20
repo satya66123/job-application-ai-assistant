@@ -112,10 +112,15 @@ def fetch_saved_ats():
     )
 
 
-def upload_knowledge(filename, document_text):
+def upload_knowledge(
+    filename,
+    document_text,
+    collection_name
+):
     payload = {
         "filename": filename,
-        "document_text": document_text
+        "document_text": document_text,
+        "collection_name": collection_name
     }
 
     return requests.post(
@@ -125,12 +130,18 @@ def upload_knowledge(filename, document_text):
         timeout=300
     )
 
+def rag_chat(
+    question,
+    model_name,
+    chat_history,
+    collection_name
+):
 
-def rag_chat(question, model_name, chat_history):
     payload = {
         "question": question,
         "modelName": model_name,
-        "chat_history": chat_history
+        "chat_history": chat_history,
+        "collection_name": collection_name
     }
 
     return requests.post(
@@ -139,6 +150,7 @@ def rag_chat(question, model_name, chat_history):
         headers=get_auth_headers(),
         timeout=300
     )
+
 
 # ---------------- AUTH ----------------
 
@@ -368,6 +380,17 @@ except requests.exceptions.RequestException:
 if task == "RAG Knowledge Upload":
 
     st.subheader("📚 Upload Knowledge Base")
+    collection_name = st.selectbox(
+        "Select Collection",
+        [
+            "General",
+            "Java",
+            "Cloud",
+            "HR",
+            "Resume",
+            "Company Docs"
+        ]
+    )
 
     rag_uploaded_file = st.file_uploader(
         "Upload PDF / DOCX / TXT",
@@ -421,15 +444,19 @@ if task == "RAG Knowledge Upload":
 
                 response = upload_knowledge(
                     filename,
-                    rag_text
+                    rag_text,
+                    collection_name
                 )
 
-            if response.status_code == 200:
+            data = response.json()
 
-                data = response.json()
 
+            if "error" in data:
+                st.warning(data["error"])
+
+            elif response.status_code == 200:
                 st.success(
-                    f"Knowledge uploaded successfully | Chunks: {data['chunks_created']}"
+                    f"Knowledge uploaded successfully | Chunks: {data.get('chunks_created', 0)}"
                 )
 
             else:
@@ -450,6 +477,18 @@ if task == "RAG Chat":
         "Ask a question from uploaded knowledge"
     )
 
+    chat_collection = st.selectbox(
+        "Search Collection",
+        [
+            "General",
+            "Java",
+            "Cloud",
+            "HR",
+            "Resume",
+            "Company Docs"
+        ]
+    )
+
     if st.button("Ask RAG"):
 
         if not rag_question.strip():
@@ -462,7 +501,8 @@ if task == "RAG Chat":
                 response = rag_chat(
                     rag_question,
                     model_name,
-                    st.session_state.chat_history
+                    st.session_state.chat_history,
+                    chat_collection
                 )
 
             if response.status_code == 200:
@@ -472,6 +512,7 @@ if task == "RAG Chat":
                 st.success("Answer generated")
 
                 answer = data["answer"]
+                sources1 = data.get("sources", [])
 
                 st.session_state.chat_history.append({
                     "role": "user",
@@ -484,6 +525,12 @@ if task == "RAG Chat":
                 })
 
                 st.write(answer)
+
+                if sources1:
+                    st.markdown("### 📚 Sources")
+
+                    for source in sources1:
+                        st.write(f"📄 {source}")
 
             else:
                 st.error(response.text)

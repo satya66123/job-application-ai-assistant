@@ -133,14 +133,14 @@ Rules:
 RAG_CHAT_PROMPT = """
 STRICT RAG MODE
 
-You MUST answer ONLY from the provided context.
+Answer ONLY using the provided context.
 
 RULES:
-- No outside knowledge
-- No assumptions
-- No guessing
-- No elaboration beyond context
-- If answer is missing, say:
+- Use ONLY the context below
+- Do NOT use outside knowledge
+- Do NOT guess
+- If the answer clearly exists in the context, answer it directly
+- If the answer truly does NOT exist in the context, say exactly:
 I could not find that in uploaded knowledge.
 
 Context:

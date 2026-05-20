@@ -5,7 +5,8 @@ from app.vectorstore.chroma_store import get_vector_store
 def ingest_document(
     text: str,
     user_id: int,
-    filename: str
+    filename: str,
+    collection_name: str
 ):
     chunks = chunk_document(text)
 
@@ -16,7 +17,8 @@ def ingest_document(
     for _ in chunks:
         metadatas.append({
             "filename": filename,
-            "user_id": user_id
+            "user_id": user_id,
+            "collection_name": collection_name
         })
 
     vector_store.add_texts(

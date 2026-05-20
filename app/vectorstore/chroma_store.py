@@ -2,9 +2,12 @@ from langchain_chroma import Chroma
 from app.rag.embeddings import get_embeddings
 
 
+VECTOR_DB_VERSION = "v2"
+
+
 def get_vector_store(user_id: int):
     return Chroma(
-        persist_directory=f"./chroma_db/user_{user_id}",
+        persist_directory=f"./chroma_db_{VECTOR_DB_VERSION}/user_{user_id}",
         embedding_function=get_embeddings()
     )
 
