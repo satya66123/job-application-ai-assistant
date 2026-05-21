@@ -23,3 +23,17 @@ def delete_vectors_by_filename(
             "filename": filename
         }
     )
+
+
+
+def delete_vectors_by_collection(
+    user_id: int,
+    collection_name: str
+):
+    vector_store = get_vector_store(user_id)
+
+    vector_store.delete(
+        where={
+            "collection_name": collection_name
+        }
+    )

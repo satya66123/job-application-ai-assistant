@@ -5,6 +5,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.repositories.admin_repository import get_dashboard_stats
+
 from app.db.database import get_db
 from app.auth.dependencies import get_current_user
 
@@ -14,6 +16,7 @@ from app.vectorstore.chroma_store import delete_vectors_by_filename
 
 from app.prompts.prompts import RAG_CHAT_PROMPT
 from app.services.openai_service import generate_resume_content
+from app.repositories.document_repository import rename_uploaded_document
 
 from app.repositories.document_repository import document_exists
 
@@ -22,6 +25,9 @@ from app.repositories.document_repository import (
     get_uploaded_documents,
     delete_uploaded_document
 )
+
+from app.repositories.document_repository import delete_collection_documents
+from app.vectorstore.chroma_store import delete_vectors_by_collection
 
 router = APIRouter(
     prefix="/rag",
@@ -37,6 +43,9 @@ class KnowledgeUploadRequest(BaseModel):
     filename: str
     document_text: str
     collection_name: str = "General"
+
+class RenameDocumentRequest(BaseModel):
+    new_filename: str
 
 class RAGChatRequest(BaseModel):
     question: str
@@ -235,3 +244,86 @@ def delete_document(
         "message": "Document deleted successfully",
         "document_id": document_id
     }
+
+@router.delete("/collections/{collection_name}")
+def delete_collection(
+    collection_name: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+
+    user = get_current_user(
+        token=token,
+        db=db
+    )
+
+    deleted_docs = delete_collection_documents(
+        db=db,
+        user_id=user.id,
+        collection_name=collection_name
+    )
+
+    if not deleted_docs:
+        return {
+            "error": "Collection not found"
+        }
+
+    delete_vectors_by_collection(
+        user.id,
+        collection_name
+    )
+
+    return {
+        "message": f"{collection_name} collection deleted successfully",
+        "deleted_count": len(deleted_docs)
+    }
+
+
+@router.put("/documents/{document_id}/rename")
+def rename_document(
+    document_id: int,
+    data: RenameDocumentRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+
+    user = get_current_user(
+        token=token,
+        db=db
+    )
+
+    renamed_doc = rename_uploaded_document(
+        db=db,
+        document_id=document_id,
+        user_id=user.id,
+        new_filename=data.new_filename
+    )
+
+    if not renamed_doc:
+        return {
+            "error": "Document not found"
+        }
+
+    return {
+        "message": "Document renamed successfully",
+        "document_id": renamed_doc.id,
+        "new_filename": renamed_doc.filename
+    }
+
+@router.get("/admin/dashboard")
+def admin_dashboard(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+
+    user = get_current_user(
+        token=token,
+        db=db
+    )
+
+    stats = get_dashboard_stats(db)
+
+    return stats

@@ -36,6 +36,12 @@ def get_auth_headers():
         "Authorization": f"Bearer {st.session_state.jwt_token}"
     }
 
+def delete_collection(collection_name):
+    return requests.delete(
+        f"{API_URL}/rag/collections/{collection_name}",
+        headers=get_auth_headers(),
+        timeout=60
+    )
 
 def register_user(full_name, email, password):
     payload = {
@@ -128,6 +134,23 @@ def upload_knowledge(
         json=payload,
         headers=get_auth_headers(),
         timeout=300
+    )
+
+def rename_document(document_id, new_filename):
+    return requests.put(
+        f"{API_URL}/rag/documents/{document_id}/rename",
+        json={
+            "new_filename": new_filename
+        },
+        headers=get_auth_headers(),
+        timeout=60
+    )
+
+def get_dashboard_stats():
+    return requests.get(
+        f"{API_URL}/rag/admin/dashboard",
+        headers=get_auth_headers(),
+        timeout=60
     )
 
 def rag_chat(
@@ -287,7 +310,8 @@ task = st.sidebar.selectbox(
         "ATS Score Checker",
         "Career AI Chat",
         "RAG Knowledge Upload",
-        "RAG Chat"
+        "RAG Chat",
+        "Admin Dashboard"
     ]
 )
 
@@ -375,7 +399,111 @@ try:
 
 except requests.exceptions.RequestException:
     st.sidebar.info("Documents unavailable")
+st.sidebar.subheader("🗑 Delete Collection")
+
+collection_to_delete = st.sidebar.selectbox(
+    "Choose collection",
+    [
+        "General",
+        "Java",
+        "Cloud",
+        "HR",
+        "Resume",
+        "Company Docs"
+    ],
+    key="delete_collection"
+)
+
+if st.sidebar.button("Delete Entire Collection"):
+    response = delete_collection(collection_to_delete)
+
+    data = response.json()
+
+    if response.status_code == 200:
+        st.sidebar.success(data["message"])
+        st.rerun()
+
+    else:
+        st.sidebar.warning(data.get("error", "Delete failed"))
+
+st.sidebar.subheader("✏ Rename Document")
+
+docs_response = requests.get(
+    f"{API_URL}/rag/documents",
+    headers=get_auth_headers()
+)
+
+if docs_response.status_code == 200:
+    docs = docs_response.json()
+
+    if docs:
+        doc_map = {
+            f"{doc['id']} - {doc['filename']}": doc["id"]
+            for doc in docs
+        }
+
+        selected_doc = st.sidebar.selectbox(
+            "Select document",
+            list(doc_map.keys()),
+            key="rename_doc"
+        )
+
+        new_name = st.sidebar.text_input(
+            "New filename",
+            key="rename_input"
+        )
+
+        if st.sidebar.button("Rename Document"):
+            if new_name.strip():
+                response = rename_document(
+                    doc_map[selected_doc],
+                    new_name
+                )
+
+                data = response.json()
+
+                if response.status_code == 200:
+                    st.sidebar.success(data["message"])
+                    st.rerun()
+                else:
+                    st.sidebar.warning(
+                        data.get("error", "Rename failed")
+                    )
+
+
+
+# ---------------- SAVED HISTORY ----------------
+if task == "Admin Dashboard":
+    st.title("📊 Admin Dashboard")
+
+    response = get_dashboard_stats()
+
+    if response.status_code == 200:
+        data = response.json()
+
+        st.metric(
+            "Total Users",
+            data["total_users"]
+        )
+
+        st.metric(
+            "Total Documents",
+            data["total_documents"]
+        )
+
+        st.subheader("Documents by Collection")
+
+        for collection in data["collections"]:
+            st.write(
+                f"{collection['collection_name']} → {collection['document_count']}"
+            )
+
+    else:
+        st.error("Failed to load dashboard")
+
+
 # ---------------- RAG KNOWLEDGE UPLOAD ----------------
+
 
 if task == "RAG Knowledge Upload":
 

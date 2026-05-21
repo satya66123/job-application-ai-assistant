@@ -53,6 +53,27 @@ def delete_uploaded_document(
     return doc
 
 
+def delete_collection_documents(
+    db: Session,
+    user_id: int,
+    collection_name: str
+):
+    docs = db.query(UploadedDocument).filter(
+        UploadedDocument.user_id == user_id,
+        UploadedDocument.collection_name == collection_name
+    ).all()
+
+    if not docs:
+        return []
+
+    for doc in docs:
+        db.delete(doc)
+
+    db.commit()
+
+    return docs
+
+
 def document_exists(
     db: Session,
     user_id: int,
@@ -64,3 +85,24 @@ def document_exists(
     ).first()
 
     return existing is not None
+
+def rename_uploaded_document(
+    db: Session,
+    document_id: int,
+    user_id: int,
+    new_filename: str
+):
+    doc = db.query(UploadedDocument).filter(
+        UploadedDocument.id == document_id,
+        UploadedDocument.user_id == user_id
+    ).first()
+
+    if not doc:
+        return None
+
+    doc.filename = new_filename
+
+    db.commit()
+    db.refresh(doc)
+
+    return doc
